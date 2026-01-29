@@ -1,62 +1,48 @@
-const express = require("express");
-const axios = require("axios");
+const userMessage = data.query.message;
 
-const app = express();
-app.use(express.json());
-
-app.post("/webhook", async (req, res) => {
-  const data = req.body;
-
-  if (!data.query || !data.query.message) {
-    return res.json({
-      replies: [{ message: "Invalid message" }]
-    });
-  }
-
-  const message = data.query.message;
-
-  // Cost control: only trigger AI if message starts with ai
-  if (!message.toLowerCase().startsWith("ai ")) {
-    return res.json({
-      replies: [{ message: "Type: ai <your question>" }]
-    });
-  }
-
-  const userPrompt = message.replace(/^ai\s+/i, "");
-
-  try {
-    const aiResponse = await axios.post(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        model: "openai/gpt-4o-mini",
-        messages: [
-          { role: "system", content: "Reply short, clear, practical. Max 4 lines." },
-          { role: "user", content: userPrompt }
-        ]
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json"
+try {
+  const aiResponse = await axios.post(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      model: "openai/gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `
+You are Muktadir's personal agent.
+Muktadir is currently busy and away from phone.
+You reply on his behalf like a real human.
+Never say you are an AI or bot.
+Reply short, casual, Bangla-English mix.
+One sentence only.
+`
+        },
+        {
+          role: "user",
+          content: userMessage
         }
+      ],
+      temperature: 0.9
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json"
       }
-    );
+    }
+  );
 
-    const replyText =
-      aiResponse.data.choices[0].message.content || "No response";
+  const reply =
+    aiResponse.data.choices[0].message.content.trim();
 
-    res.json({
-      replies: [{ message: replyText }]
-    });
+  res.json({
+    replies: [{ message: reply }]
+  });
 
-  } catch (err) {
-    res.json({
-      replies: [{ message: "AI error. Try again later." }]
-    });
-  }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
-});
+} catch (err) {
+  res.json({
+    replies: [
+      { message: "Akhon busy achi. Ektu pore reply debo." }
+    ]
+  });
+}
